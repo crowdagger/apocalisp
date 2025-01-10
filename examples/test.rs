@@ -27,4 +27,7 @@ fn main() {
     let env = env.bind(String::from("x"), Box::new(Number::new(1)));
     let t = env.lookup("x").unwrap();
     println!("{:?}", t.display());
+
+    let r = l.apply(Box::new(Number::new(2)), env);
+    println!("{:?}", r.display());
 }

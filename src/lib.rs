@@ -2,6 +2,7 @@ use std::boxed::Box;
 use std::fmt::Debug;
 use std::unimplemented;
 use std::collections::HashMap;
+use mopa::mopafy;
 
 pub struct Environment {
     parent: Option<Box<Environment>>,
@@ -40,7 +41,7 @@ impl Environment {
 
 
 
-pub trait Expr : Debug {
+pub trait Expr : Debug + mopa::Any + 'static {
     fn eval(& self, env: &Environment) -> Box<dyn Expr>;
     fn display(& self) -> String;
     fn is_empty(&self) -> bool {
@@ -53,6 +54,8 @@ pub trait Expr : Debug {
         false
     }
 }
+
+mopafy!(Expr);
 
 #[derive(Debug, Clone)]
 pub struct Identifier {
@@ -77,20 +80,27 @@ impl Expr for Identifier {
 
 
 #[derive(Debug)]
-pub struct Lambda<A:Expr, B:Expr> {
-    params: A,
+pub struct Lambda<B:Expr> {
+    params: Identifier,
     body: B
 }
 
-impl<A:Expr, B:Expr> Lambda<A, B> {
-    pub fn lambda(a: A, b: B) -> Lambda<A, B> {
+impl<B:Expr> Lambda<B> {
+    pub fn lambda(a: Identifier, b: B) -> Lambda<B> {
         Lambda { params: a,
                  body: b
         }
     }
+
+    /// Apply the lambda with bindings to the value
+    pub fn apply(&self, value: Box<dyn Expr>, env: Environment) -> Box<dyn Expr> {
+        let mut e = env;
+        e = e.bind(self.params.inner.clone(), value);
+        self.body.eval(&e)
+    }
 }
 
-impl<A:Expr, B:Expr> Expr for Lambda<A, B> {
+impl<B:Expr> Expr for Lambda<B> {
     fn display(&self) -> String {
         format!("λ {} -> {}", self.params.display(), self.body.display())
     }
@@ -170,7 +180,7 @@ impl<A:Expr, B:Expr> Cons<A, B> {
 
 impl<A:Expr, B:Expr> Expr for Cons<A,B> {
     fn eval(&self, env: &Environment) -> Box<dyn Expr> {
-        unimplemented!();
+        Box::new(Identifier::new(self.display()))
     }
 
     fn display(&self) -> String {
