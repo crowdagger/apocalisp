@@ -6,12 +6,12 @@ use apocalisp::Identifier;
 use apocalisp::Lambda;
 use apocalisp::Environment;
 
-use std::boxed::Box;
+use std::sync::Arc;
 
 
 fn main() {
     let env = Environment::empty();
-    let e = Box::new(Empty{});
+    let e = Arc::new(Empty{});
     println!("{:?}", e.eval(&env));
 
     let b = Cons::cons(Number::new(1), Cons::cons(Number::new(2), Empty{}));
@@ -24,10 +24,10 @@ fn main() {
     let l = Lambda::lambda(x, body);
     println!("{:?} {:?}", l.display(), l.is_list());
 
-    let env = env.bind(String::from("x"), Box::new(Number::new(1)));
+    let env = env.bind(String::from("x"), Arc::new(Number::new(1)));
     let t = env.lookup("x").unwrap();
     println!("{:?}", t.display());
 
-    let r = l.apply(Box::new(Number::new(2)), env);
+    let r = l.apply(Arc::new(Number::new(2)), env);
     println!("{:?}", r.display());
 }

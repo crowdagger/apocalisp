@@ -1,12 +1,12 @@
-use std::boxed::Box;
+use std::sync::Arc;
 use std::fmt::Debug;
 use std::unimplemented;
 use std::collections::HashMap;
 use mopa::mopafy;
 
 pub struct Environment {
-    parent: Option<Box<Environment>>,
-    map: HashMap<String, Box<dyn Expr>>
+    parent: Option<Arc<Environment>>,
+    map: HashMap<String, Arc<dyn Expr>>
 }
 
 impl Environment {
@@ -17,7 +17,7 @@ impl Environment {
         }
     }
     
-    pub fn lookup(&self, id: &str) -> Option<&Box<dyn Expr>> {
+    pub fn lookup(&self, id: &str) -> Option<&Arc<dyn Expr>> {
         match self.map.get(id) {
             Some(v) => Some(v),
             None => {
@@ -31,8 +31,8 @@ impl Environment {
     }
 
     /// Bind new variables, creating a new environment
-    pub fn bind(self, var: String, value: Box<dyn Expr>) -> Environment {
-        let mut e = Environment { parent : Some(Box::new(self)),
+    pub fn bind(self, var: String, value: Arc<dyn Expr>) -> Environment {
+        let mut e = Environment { parent : Some(Arc::new(self)),
                                   map: HashMap::new() };
         e.map.insert(var, value);
         e
@@ -42,7 +42,7 @@ impl Environment {
 
 
 pub trait Expr : Debug + mopa::Any + 'static {
-    fn eval(& self, env: &Environment) -> Box<dyn Expr>;
+    fn eval(& self, env: &Environment) -> Arc<dyn Expr>;
     fn display(& self) -> String;
     fn is_empty(&self) -> bool {
         false
@@ -69,7 +69,7 @@ impl Identifier {
 }
 
 impl Expr for Identifier {
-    fn eval(&self, env: &Environment) -> Box<dyn Expr> {
+    fn eval(&self, env: &Environment) -> Arc<dyn Expr> {
         unimplemented!();
     }
 
@@ -93,7 +93,7 @@ impl<B:Expr> Lambda<B> {
     }
 
     /// Apply the lambda with bindings to the value
-    pub fn apply(&self, value: Box<dyn Expr>, env: Environment) -> Box<dyn Expr> {
+    pub fn apply(&self, value: Arc<dyn Expr>, env: Environment) -> Arc<dyn Expr> {
         let mut e = env;
         e = e.bind(self.params.inner.clone(), value);
         self.body.eval(&e)
@@ -105,7 +105,7 @@ impl<B:Expr> Expr for Lambda<B> {
         format!("λ {} -> {}", self.params.display(), self.body.display())
     }
 
-    fn eval(&self, env: &Environment) -> Box<dyn Expr> {
+    fn eval(&self, env: &Environment) -> Arc<dyn Expr> {
         unimplemented!{}
     }
 }
@@ -117,8 +117,8 @@ pub struct Empty {
 }
 
 impl Expr for Empty {
-    fn eval(& self, _: &Environment) -> Box<dyn Expr> {
-        Box::new(Empty {})
+    fn eval(& self, _: &Environment) -> Arc<dyn Expr> {
+        Arc::new(Empty {})
     }
 
     fn display(& self) -> String {
@@ -149,8 +149,8 @@ impl Number {
 }
 
 impl Expr for Number {
-    fn eval(&self, _: &Environment) -> Box<dyn Expr> {
-        Box::new(Number{inner: self.inner})
+    fn eval(&self, _: &Environment) -> Arc<dyn Expr> {
+        Arc::new(Number{inner: self.inner})
     }
 
     fn display(& self) -> String {
@@ -158,29 +158,25 @@ impl Expr for Number {
     }
 }
 
-// pub fn cons<A:Expr, B:List>(a:A, b: B) -> List<A, B> {
-//     List::Pair(a, b)
-// }
-
 /// More or less anything
 #[derive(Debug)]
 pub struct Cons<A:Expr, B:Expr> {
-    car: A,
-    cdr: B
+    car: Arc<A>,
+    cdr: Arc<B>
 }
 
 impl<A:Expr, B:Expr> Cons<A, B> {
-    pub fn cons(a: A, b: B) -> Cons<A,B> {
-        Cons {car: a,
-              cdr: b}
+    pub fn cons(a: Arc<A>, b: Arc<B>) -> Cons<A,B> {
+        Cons {car: a.clone(),
+              cdr: b.clone()}
     }
 
 
 }
 
 impl<A:Expr, B:Expr> Expr for Cons<A,B> {
-    fn eval(&self, env: &Environment) -> Box<dyn Expr> {
-        Box::new(Identifier::new(self.display()))
+    fn eval(&self, env: &Environment) -> Arc<dyn Expr> {
+        Arc::new(Identifier::new(self.display()))
     }
 
     fn display(&self) -> String {
@@ -212,7 +208,7 @@ mod tests {
 
     #[test]
     fn empty() {
-        let e = Box::new(Empty{});
+        let e = Arc::new(Empty{});
         assert!(e.is_list());
     }
 
