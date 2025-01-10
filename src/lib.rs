@@ -10,9 +10,9 @@ pub struct Environment {
 }
 
 impl Environment {
-    pub fn empty() -> Self {
+    pub fn empty(parent: Option<Arc<Environment>>) -> Self {
         Self {
-            parent: None,
+            parent: parent,
             map: HashMap::new()
         }
     }
@@ -31,11 +31,10 @@ impl Environment {
     }
 
     /// Bind new variables, creating a new environment
-    pub fn bind(self, var: String, value: Arc<dyn Expr>) -> Environment {
-        let mut e = Environment { parent : Some(Arc::new(self)),
-                                  map: HashMap::new() };
+    pub fn bind(self: Arc<Self>, var: String, value: Arc<dyn Expr>) -> Arc<Environment> {
+        let mut e = Environment::empty(Some(self.clone()));
         e.map.insert(var, value);
-        e
+        Arc::new(e)
     }
 }
 
@@ -63,8 +62,8 @@ pub struct Identifier {
 }
 
 impl Identifier {
-    pub fn new(s: String) -> Self {
-        Identifier { inner: s }
+    pub fn new(s: String) -> Arc<Self> {
+        Arc::new(Identifier { inner: s })
     }
 }
 
@@ -81,21 +80,20 @@ impl Expr for Identifier {
 
 #[derive(Debug)]
 pub struct Lambda<B:Expr> {
-    params: Identifier,
-    body: B
+    params: Arc<Identifier>,
+    body: Arc<B>,
 }
 
 impl<B:Expr> Lambda<B> {
-    pub fn lambda(a: Identifier, b: B) -> Lambda<B> {
+    pub fn lambda(a: Arc<Identifier>, b: Arc<B>) -> Lambda<B> {
         Lambda { params: a,
                  body: b
         }
     }
 
     /// Apply the lambda with bindings to the value
-    pub fn apply(&self, value: Arc<dyn Expr>, env: Environment) -> Arc<dyn Expr> {
-        let mut e = env;
-        e = e.bind(self.params.inner.clone(), value);
+    pub fn apply(&self, value: Arc<dyn Expr>, env: Arc<Environment>) -> Arc<dyn Expr> {
+        let e = env.bind(self.params.inner.clone(), value.clone());
         self.body.eval(&e)
     }
 }
@@ -114,6 +112,12 @@ impl<B:Expr> Expr for Lambda<B> {
 /// The empty list, a.k.a ()
 #[derive(Debug)]
 pub struct Empty {
+}
+
+impl Empty {
+    pub fn empty() -> Arc<Empty> {
+        Arc::new(Empty{})
+    }
 }
 
 impl Expr for Empty {
@@ -143,8 +147,8 @@ pub struct Number {
 }
 
 impl Number {
-    pub fn new(n: i64) -> Self {
-        Number { inner: n }
+    pub fn new(n: i64) -> Arc<Self> {
+        Arc::new(Number { inner: n })
     }
 }
 
@@ -166,9 +170,9 @@ pub struct Cons<A:Expr, B:Expr> {
 }
 
 impl<A:Expr, B:Expr> Cons<A, B> {
-    pub fn cons(a: Arc<A>, b: Arc<B>) -> Cons<A,B> {
-        Cons {car: a.clone(),
-              cdr: b.clone()}
+    pub fn cons(a: Arc<A>, b: Arc<B>) -> Arc<Cons<A,B>> {
+        Arc::new(Cons {car: a.clone(),
+              cdr: b.clone()})
     }
 
 
@@ -176,7 +180,7 @@ impl<A:Expr, B:Expr> Cons<A, B> {
 
 impl<A:Expr, B:Expr> Expr for Cons<A,B> {
     fn eval(&self, env: &Environment) -> Arc<dyn Expr> {
-        Arc::new(Identifier::new(self.display()))
+        Identifier::new(self.display())
     }
 
     fn display(&self) -> String {
