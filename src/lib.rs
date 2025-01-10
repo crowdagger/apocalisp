@@ -1,9 +1,47 @@
 use std::boxed::Box;
 use std::fmt::Debug;
 use std::unimplemented;
+use std::collections::HashMap;
+
+pub struct Environment {
+    parent: Option<Box<Environment>>,
+    map: HashMap<String, Box<dyn Expr>>
+}
+
+impl Environment {
+    pub fn empty() -> Self {
+        Self {
+            parent: None,
+            map: HashMap::new()
+        }
+    }
+    
+    pub fn lookup(&self, id: &str) -> Option<&Box<dyn Expr>> {
+        match self.map.get(id) {
+            Some(v) => Some(v),
+            None => {
+                if let Some(env) = &self.parent {
+                    env.lookup(id)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    /// Bind new variables, creating a new environment
+    pub fn bind(self, var: String, value: Box<dyn Expr>) -> Environment {
+        let mut e = Environment { parent : Some(Box::new(self)),
+                                  map: HashMap::new() };
+        e.map.insert(var, value);
+        e
+    }
+}
+
+
 
 pub trait Expr : Debug {
-    fn eval(& self) -> Box<dyn Expr>;
+    fn eval(& self, env: &Environment) -> Box<dyn Expr>;
     fn display(& self) -> String;
     fn is_empty(&self) -> bool {
         false
@@ -16,6 +54,52 @@ pub trait Expr : Debug {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Identifier {
+    inner: String
+}
+
+impl Identifier {
+    pub fn new(s: String) -> Self {
+        Identifier { inner: s }
+    }
+}
+
+impl Expr for Identifier {
+    fn eval(&self, env: &Environment) -> Box<dyn Expr> {
+        unimplemented!();
+    }
+
+    fn display(&self) -> String {
+        format!("{}", self.inner)
+    }
+}
+
+
+#[derive(Debug)]
+pub struct Lambda<A:Expr, B:Expr> {
+    params: A,
+    body: B
+}
+
+impl<A:Expr, B:Expr> Lambda<A, B> {
+    pub fn lambda(a: A, b: B) -> Lambda<A, B> {
+        Lambda { params: a,
+                 body: b
+        }
+    }
+}
+
+impl<A:Expr, B:Expr> Expr for Lambda<A, B> {
+    fn display(&self) -> String {
+        format!("λ {} -> {}", self.params.display(), self.body.display())
+    }
+
+    fn eval(&self, env: &Environment) -> Box<dyn Expr> {
+        unimplemented!{}
+    }
+}
+
 
 /// The empty list, a.k.a ()
 #[derive(Debug)]
@@ -23,7 +107,7 @@ pub struct Empty {
 }
 
 impl Expr for Empty {
-    fn eval(& self) -> Box<dyn Expr> {
+    fn eval(& self, _: &Environment) -> Box<dyn Expr> {
         Box::new(Empty {})
     }
 
@@ -55,7 +139,7 @@ impl Number {
 }
 
 impl Expr for Number {
-    fn eval(&self) -> Box<dyn Expr> {
+    fn eval(&self, _: &Environment) -> Box<dyn Expr> {
         Box::new(Number{inner: self.inner})
     }
 
@@ -85,7 +169,7 @@ impl<A:Expr, B:Expr> Cons<A, B> {
 }
 
 impl<A:Expr, B:Expr> Expr for Cons<A,B> {
-    fn eval(&self) -> Box<dyn Expr> {
+    fn eval(&self, env: &Environment) -> Box<dyn Expr> {
         unimplemented!();
     }
 
